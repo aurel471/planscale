@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlanScale</title>
+<meta name="description" content="Architekturpläne über ein Referenzmaß kalibrieren und maßstäblich auf DIN- oder freie Formate setzen. Läuft lokal im Browser.">
+<meta name="theme-color" content="#111111">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<style>
+  :root {
+    --mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --bg: #111111;
+    --ink: #e9e7e2;
+    --muted: #8e8c87;
+    --accent: #c8624a;
+    --measure: #4a8fc8;
+    --line: #5a5a5a;
+    --border: rgba(255,255,255,0.22);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--mono); background: var(--bg); color: var(--ink);
+    margin: 0; padding: 28px 32px 24px; font-size: 0.86rem;
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; letter-spacing: 0.01em; font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 0.8rem; }
+  .sub .local { color: #8fbf7a; margin-left: 10px; cursor: help; }
+  .sub .ver { margin-left: 10px; }
+  .sub a { color: var(--muted); }
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; gap: 28px; }
+
+  .panel { border-right: 1px dotted var(--line); padding-right: 24px; display: flex; flex-direction: column; min-height: 0; }
+  .panel-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .panel-scroll::-webkit-scrollbar { display: none; }
+  .panel-actions { flex: none; padding-top: 14px; margin-top: 10px; border-top: 1px dotted var(--line); }
+
+  fieldset { border: none; padding: 0; margin: 0 0 20px; }
+  legend { display: flex; align-items: center; gap: 7px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+           color: var(--muted); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dotted var(--line); width: 100%; }
+  .tag { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px solid var(--ink); font-size: 0.65rem; color: var(--ink); }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .row > .lbl { flex: 1; min-width: 0; }
+  .hint { color: var(--muted); font-size: 0.76rem; line-height: 1.45; margin: 4px 0 8px; }
+  .hint b { color: var(--ink); font-weight: 500; }
+  .hidden { display: none !important; }
+
+  input[type=text], select {
+    padding: 4px 6px; border: 1px solid var(--border); border-radius: 0; font-family: inherit; font-size: 0.82rem;
+    background: var(--bg); color: var(--ink); -webkit-user-select: text; user-select: text;
+  }
+  input[type=text] { width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=text]:focus, select:focus { outline: none; border-color: var(--accent); }
+  input.wide { width: 100%; text-align: left; }
+  input[type=checkbox] { appearance: none; width: 15px; height: 15px; margin: 0; position: relative; border: 1px solid var(--ink); background: var(--bg); cursor: pointer; flex: none; }
+  input[type=checkbox]:checked::after { content: "×"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; line-height: 1; }
+  label.check { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; cursor: pointer; }
+
+  button {
+    font-family: inherit; font-size: 0.8rem; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--border); padding: 5px 10px; cursor: pointer; border-radius: 0;
+  }
+  button:hover { border-color: var(--ink); }
+  button:disabled { opacity: 0.35; cursor: default; border-color: var(--border); }
+  button.primary { width: 100%; padding: 10px; border-color: var(--accent); color: var(--ink); background: rgba(200,98,74,0.14); font-size: 0.85rem; }
+  button.primary:hover:not(:disabled) { background: rgba(200,98,74,0.28); }
+  button.on, .chip.on { border-color: var(--accent); background: rgba(200,98,74,0.18); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .chip { padding: 3px 7px; font-size: 0.76rem; min-width: 34px; }
+  .seg { display: flex; margin-bottom: 10px; }
+  .seg button { flex: 1; padding: 5px 4px; font-size: 0.74rem; }
+  .seg button + button { border-left: none; }
+
+  .drop { border: 1px dashed var(--line); padding: 16px; text-align: center; cursor: pointer; color: var(--muted); margin-bottom: 10px; font-size: 0.8rem; word-break: break-all; }
+  .drop:hover { border-color: var(--ink); color: var(--ink); }
+  .drop.has-file { border-color: var(--accent); color: var(--ink); }
+
+  .readout { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 0.78rem; margin-top: 6px; }
+  .readout dt { color: var(--muted); }
+  .readout dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: #8fbf7a; } .bad { color: var(--accent); }
+
+  /* Ansicht */
+  .viewer { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .toolbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; }
+  .toolbar button kbd { color: var(--muted); font-family: inherit; font-size: 0.68rem; margin-left: 5px; }
+  .toolbar .spacer { flex: 1; }
+  .stage { position: relative; flex: 1; min-height: 0; border: 1px dotted var(--line); overflow: hidden; background: #1a1a1a; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 10px; pointer-events: none; text-align: center; line-height: 1.6; }
+  .empty b { color: var(--ink); font-weight: 500; }
+  .stage.dragover { outline: 2px dashed var(--accent); outline-offset: -8px; }
+  .status { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.76rem; color: var(--muted); padding-top: 8px; font-variant-numeric: tabular-nums; min-height: 1.6em; }
+  .status b { color: var(--ink); font-weight: 500; }
+
+  .refbox { position: absolute; z-index: 5; background: var(--bg); border: 1px solid var(--accent); padding: 10px; display: flex; gap: 6px; align-items: center; box-shadow: 0 6px 24px rgba(0,0,0,0.5); }
+  .refbox span { color: var(--muted); font-size: 0.76rem; }
+
+  .tip { position: fixed; z-index: 30; max-width: 300px; background: #1d1d1d; border: 1px solid var(--border); padding: 9px 11px;
+         font-size: 0.75rem; line-height: 1.5; color: var(--ink); pointer-events: none; opacity: 0; transform: translateY(-4px);
+         transition: opacity 0.15s, transform 0.15s; box-shadow: 0 8px 28px rgba(0,0,0,0.55); }
+  .tip.show { opacity: 1; transform: none; }
+  .tip b { color: var(--accent); font-weight: 500; }
+  .toast { position: fixed; right: 28px; bottom: 26px; background: var(--bg); border: 1px solid var(--border); padding: 10px 14px; max-width: 460px; font-size: 0.8rem; z-index: 20; display: flex; gap: 12px; align-items: center; opacity: 0; transform: translateY(8px); transition: 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast.err { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<h1>PlanScale</h1>
+<p class="sub">Architekturpläne über ein Referenzmaß kalibrieren und maßstäblich auf DIN- oder freie Formate setzen. <span class="local" data-tip="PlanScale läuft vollständig in deinem Browser. Pläne werden <b>nicht hochgeladen</b>, nirgendwo gespeichert und verlassen deinen Rechner nicht. Nach dem ersten Besuch funktioniert die App auch offline.">● lokal, ohne Upload</span><span class="ver" id="ver"></span></p>
+
+<div class="layout">
+  <aside class="panel">
+    <div class="panel-scroll">
+
+      <fieldset>
+        <legend><span class="tag">1</span>Plan</legend>
+        <div class="drop" id="drop" data-tip="Öffnet einen Plan. <b>PDFs</b> bleiben beim Export Vektoren und damit gestochen scharf, <b>Bilder/Scans</b> (PNG, JPG) werden in ihrer Auflösung übernommen. CAD-Dateien (DWG/DXF) vorher als PDF exportieren.">PDF oder Bild öffnen<br><span style="font-size:0.72rem">Klicken oder hineinziehen · ⌘O</span></div>
+        <div class="row hidden" id="pageRow"><span class="lbl">Seite</span><select id="pageSel"></select></div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="tag">2</span>Referenzmaß</legend>
+        <div class="seg" id="calSeg">
+          <button data-cal="ref" data-tip="Du kennst ein Maß im Plan, z.&nbsp;B. eine Bemaßungskette, Türbreite oder Rasterachse. Du klickst Anfang und Ende an und gibst die echte Länge ein, daraus wird der Maßstab berechnet.">Referenzlinie</button>
+          <button data-cal="known" data-tip="Das PDF ist schon maßstäblich angelegt, z.&nbsp;B. ein 1:100-Plan aus ArchiCAD, Vectorworks oder AutoCAD in Originalgröße. Dann braucht es keine Referenzlinie.">Maßstab bekannt</button>
+          <button data-cal="none" data-tip="Nur prozentual skalieren, z.&nbsp;B. für Skizzen oder Bilder ohne bekannte Maße. Maßstabsleiste und Beschriftung sind dann aus.">Ohne</button>
+        </div>
+        <div id="calRef">
+          <div class="row"><button id="refBtn" style="flex:1" data-tip="Referenz-Werkzeug (<b>R</b>): 1.&nbsp;Klick Startpunkt, 2.&nbsp;Klick Endpunkt, dann Länge eingeben. Je länger die Referenz, desto genauer der Maßstab, also lieber die Gesamtbemaßung statt einer kurzen Tür.">Referenz setzen <span style="color:var(--muted)">R</span></button></div>
+          <p class="hint" id="refHint">Zwei Punkte auf einem bekannten Maß im Plan anklicken (z.&nbsp;B. eine Bemaßung oder Wandlänge). Punkte rasten an Linienenden ein, <b>⇧</b> hält waagerecht/senkrecht, <b>⌥</b> schaltet Einrasten kurz aus.</p>
+          <div class="row"><span class="lbl">Länge der Referenz</span><input type="text" id="refLen" placeholder="–" data-tip="Echte Länge der Referenzlinie. Komma oder Punkt als Dezimaltrenner."><select id="refUnit"><option>mm</option><option>cm</option><option selected>m</option></select></div>
+        </div>
+        <div id="calKnown" class="hidden">
+          <div class="row"><span class="lbl">Plan in Originalgröße ist</span>1&nbsp;:&nbsp;<input type="text" id="srcScale" placeholder="100" data-tip="Maßstab, in dem das PDF in seiner Originalseitengröße gezeichnet ist."></div>
+          <p class="hint">Für PDFs, die schon maßstäblich angelegt sind (z.&nbsp;B. ein 1:100-Plan als A1-PDF).</p>
+        </div>
+        <div id="calNone" class="hidden">
+          <p class="hint">Ohne Referenz wird nur prozentual skaliert, ein Maßstab ist dann nicht bekannt.</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="tag">3</span>Arbeitsbereich</legend>
+        <div class="chips" id="fmtChips" data-tip="DIN-Blattformate. Jede Stufe halbiert die Fläche: A0 = 2&times; A1 = 4&times; A2 … B-Formate sind etwas größer als die gleichnamigen A-Formate."></div>
+        <div class="seg" id="orientSeg">
+          <button data-o="hoch">Hochformat</button>
+          <button data-o="quer">Querformat</button>
+        </div>
+        <div class="row hidden" id="customRow" data-tip="Freies Format in cm, z.&nbsp;B. für Plotterrollen (Breite 61 / 91,4 cm), Präsentationstafeln oder Passepartouts.">
+          <span class="lbl">Breite × Höhe</span>
+          <input type="text" id="customW" style="width:58px">×<input type="text" id="customH" style="width:58px">cm
+        </div>
+        <div class="row" data-tip="Freizuhaltender Rand (gestrichelt). Wird beim Einpassen, Zentrieren und Ausrichten berücksichtigt. Abgeschnitten wird beim Export nur am Blattrand, nicht am Rand."><span class="lbl">Rand</span><input type="text" id="margin" style="width:58px">mm</div>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="tag">4</span>Maßstab</legend>
+        <div id="scaleCal">
+          <div class="row"><span class="lbl">Zielmaßstab</span>1&nbsp;:&nbsp;<input type="text" id="scaleM" data-tip="Zielmaßstab auf dem Blatt. <b>1:50</b> heißt: 1&nbsp;m in echt = 2&nbsp;cm auf dem Papier. Krumme Werte wie 1:63 gehen auch."></div>
+          <div class="chips" id="scaleChips" data-tip="Übliche Maßstäbe: 1:500–1:200 Lageplan, 1:100 Entwurf, 1:50 Werkplanung, 1:20–1:1 Details."></div>
+        </div>
+        <div id="scalePct" class="hidden">
+          <div class="row"><span class="lbl">Skalierung</span><input type="text" id="percent" data-tip="Größe relativ zur Originalseite des PDFs.">%</div>
+        </div>
+        <div class="row">
+          <button id="fitBtn" style="flex:1" data-tip="Wählt den größten Maßstab, bei dem der Plan in den Rand passt, und zentriert ihn.">Auf Blatt einpassen</button>
+          <label class="check" style="margin:0" id="roundWrap" data-tip="Rundet beim Einpassen auf übliche Maßstäbe (1:20, 1:25, 1:50, 1:100 …) statt auf krumme Werte wie 1:63,7."><input type="checkbox" id="roundScale" checked>Normmaßstab</label>
+        </div>
+        <dl class="readout" id="readout"></dl>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="tag">5</span>Lage auf dem Blatt</legend>
+        <div class="row">
+          <button id="rotL" data-tip="90° gegen den Uhrzeigersinn drehen, die Planmitte bleibt stehen.">⟲ 90°</button>
+          <button id="rotR" data-tip="90° im Uhrzeigersinn drehen, die Planmitte bleibt stehen.">⟳ 90°</button>
+          <button id="centerBtn" style="flex:1" data-tip="Plan mittig aufs Blatt setzen (<b>C</b>).">Zentrieren</button>
+        </div>
+        <div class="row" data-tip="Linke obere Ecke des Plans, gemessen von der linken oberen Blattecke. Zum exakten Positionieren."><span class="lbl">Position X / Y</span><input type="text" id="posX" style="width:62px"><input type="text" id="posY" style="width:62px">mm</div>
+        <p class="hint">Plan mit dem Verschiebe-Werkzeug <b>V</b> ziehen oder mit den Pfeiltasten bewegen (⇧ = 10&nbsp;mm). Was über das Blatt ragt, wird beim Export abgeschnitten.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend><span class="tag">6</span>Ausgabe</legend>
+        <label class="check" data-tip="Grafische Maßstabsleiste unten links, bleibt auch nach Verkleinern oder Kopieren korrekt."><input type="checkbox" id="optBar">Maßstabsleiste</label>
+        <label class="check" data-tip="Schreibt „M 1:x“ neben die Maßstabsleiste."><input type="checkbox" id="optLabel">Maßstab beschriften (M 1:x)</label>
+        <label class="check" data-tip="Zeichnet einen dünnen Rahmen auf die Randlinie, z.&nbsp;B. als Schnitt- oder Planrahmen."><input type="checkbox" id="optFrame">Rahmen auf Randlinie</label>
+      </fieldset>
+    </div>
+    <div class="panel-actions">
+      <button class="primary" id="exportBtn" disabled data-tip="Speichert ein PDF in exakter Blattgröße. Beim Drucken <b>„Tatsächliche Größe“ / 100&nbsp;%</b> wählen, nicht „An Seite anpassen“, sonst stimmt der Maßstab nicht.">PDF exportieren <span style="color:var(--muted)">⌘S</span></button>
+    </div>
+  </aside>
+
+  <main class="viewer">
+    <div class="toolbar">
+      <button data-tool="move" data-tip="Plan auf dem Blatt ziehen. Er richtet sich dabei magnetisch an Blattkanten, Rand und Mittellinien aus (pinke Hilfslinien). <b>⌥</b> halten = frei bewegen.">Verschieben<kbd>V</kbd></button>
+      <button data-tool="hand" data-tip="Ansicht verschieben, ohne den Plan zu bewegen. Geht auch jederzeit mit Leertaste + Ziehen oder Zwei-Finger-Scrollen.">Ansicht<kbd>H</kbd></button>
+      <button data-tool="ref" data-tip="Referenzlinie setzen: zwei Klicks auf ein bekanntes Maß, dann Länge eingeben.">Referenz<kbd>R</kbd></button>
+      <button data-tool="measure" data-tip="Strecken im Plan nachmessen, um den Maßstab zu prüfen. Zeigt die echte Länge und die Länge auf dem Blatt. <b>⌫</b> löscht die letzte Messung.">Messen<kbd>M</kbd></button>
+      <span class="sep"></span>
+      <label class="check" style="margin:0" data-tip="Beim Setzen von Punkten springt der Cursor auf die nächste <b>Ecke oder das nächste Linienende</b> im PDF (grünes Quadrat). So triffst du exakt die Ecke statt knapp daneben. Die Lupe zeigt alle verfügbaren Punkte als grüne Punkte. <b>⌥</b> halten = kurz aus. Geht nur bei Vektor-PDFs, nicht bei Scans."><input type="checkbox" id="snapOn">An Ecken einrasten</label>
+      <span class="sep"></span>
+      <button id="clearMeasures" data-tip="Entfernt alle Messlinien. Die Referenz bleibt erhalten.">Messungen löschen</button>
+      <span class="spacer"></span>
+      <button id="fitView" data-tip="Zoomt so, dass Blatt und Plan ganz sichtbar sind (<b>F</b>).">Ansicht einpassen<kbd>F</kbd></button>
+    </div>
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="empty" id="empty"><b>Plan hier hineinziehen</b>PDF · PNG · JPG<br>oder links „PDF oder Bild öffnen“</div>
+      <div class="refbox hidden" id="refbox">
+        <span>Länge</span><input type="text" id="refboxLen"><select id="refboxUnit"><option>mm</option><option>cm</option><option>m</option></select>
+        <button id="refboxOk">OK</button>
+      </div>
+    </div>
+    <div class="status" id="status"></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="tip" id="tip"></div>
+<input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" class="hidden">
+
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
