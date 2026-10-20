@@ -83,10 +83,6 @@ python3 -m http.server 8000 -d web
 - `web/vendor/`: Bibliotheken lokal eingebunden (pdf.js 6.4.299 Legacy-Build, pdf-lib 1.17.1), kein CDN
 - `desktop/`: optionale Mac-App für den Eigengebrauch (pywebview-Fenster um `web/`)
 
-**Neue Version veröffentlichen:** `VERSION` in `web/js/app.js` und `CACHE` in `web/sw.js` hochzählen,
-dann auf `main` pushen. GitHub Actions veröffentlicht `web/` automatisch über GitHub Pages
-(Repo → Settings → Pages → Source: „GitHub Actions“).
-
 ## Lizenz
 
 MIT, siehe [LICENSE](LICENSE). Enthaltene Bibliotheken: pdf.js (Apache-2.0), pdf-lib (MIT),
