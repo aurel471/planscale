@@ -4,8 +4,9 @@ Architekturpläne über ein Referenzmaß kalibrieren und maßstäblich auf DIN-A
 oder ein freies Format in cm setzen. Der Export bleibt bei PDFs vektorbasiert.
 
 **Läuft komplett im Browser.** Pläne werden nicht hochgeladen und verlassen den eigenen
-Rechner nicht. Nach dem ersten Besuch funktioniert die App auch offline und lässt sich
-installieren (Chrome/Edge: Symbol in der Adressleiste, Safari: Ablage → Zum Dock hinzufügen).
+Rechner nicht (Details unter [Datenschutz](#datenschutz)). Nach dem ersten Besuch funktioniert
+die App auch offline und lässt sich installieren (Chrome/Edge: Symbol in der Adressleiste,
+Safari: Ablage → Zum Dock hinzufügen).
 
 ## So geht's
 
@@ -33,6 +34,40 @@ installieren (Chrome/Edge: Symbol in der Adressleiste, Safari: Ablage → Zum Do
 | ⌫ | letzte Messung löschen |
 
 Referenz, Maßstab und Lage werden pro Plan im Browser gespeichert.
+
+## Datenschutz
+
+PlanScale verarbeitet Pläne ausschließlich lokal auf dem eigenen Gerät. Es gibt keinen
+Server, der Dateien entgegennimmt, und keinen Online-Speicher.
+
+- **Kein Upload.** Geöffnete PDFs und Bilder werden im Browser mit pdf.js und pdf-lib
+  gelesen, dargestellt und exportiert. Der Code enthält keine Funktion, die Plandaten
+  über das Netz sendet.
+- **Keine Cloud, kein Konto.** Keine Anmeldung, keine Synchronisation, keine Datenbank.
+- **Kein Tracking.** Keine Analyse-Tools, keine Cookies, keine Werbung, keine
+  Fehlerberichte an Dritte.
+- **Keine Drittanbieter.** Alle Bibliotheken, Schriften und Icons liegen im Repository
+  (`web/vendor/`). Es werden keine CDNs, Google Fonts o. Ä. geladen. Der Service Worker
+  beantwortet nur Anfragen an die eigene Adresse der App.
+- **Was lokal gespeichert wird:** Im `localStorage` des Browsers liegen nur
+  Einstellungen (Blattformat, Rand, Optionen) und pro Plan die Kalibrierung (Referenzpunkte,
+  Maßstab, Lage, Messungen). Als Schlüssel dient eine SHA-1-Prüfsumme der Datei, nicht der
+  Dateiname. Der Plan selbst wird nicht gespeichert. Der Service Worker legt nur die
+  App-Dateien für den Offline-Betrieb im Browser-Cache ab.
+- **Löschen:** Über die Browser-Einstellungen die Website-Daten der App entfernen. Damit
+  sind alle gespeicherten Einstellungen weg.
+- **Desktop-Version:** Der eingebaute Webserver lauscht nur auf `127.0.0.1` und ist aus dem
+  Netzwerk nicht erreichbar.
+
+**Hosting:** Die Web-Version wird über GitHub Pages ausgeliefert. Beim Aufruf der Seite
+lädt der Browser nur die App-Dateien. GitHub verarbeitet dabei wie jeder Webhoster technisch
+notwendige Verbindungsdaten (z. B. IP-Adresse), siehe
+[GitHub-Datenschutzerklärung](https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement).
+Plandaten erreichen GitHub dabei nicht. Wer auch das ausschließen will, nutzt die
+Desktop-Version oder startet die App lokal (siehe unten).
+
+Das lässt sich prüfen: Entwicklertools → Netzwerk öffnen, einen Plan laden und exportieren.
+Es gehen keine Anfragen nach außen.
 
 ## Entwicklung
 
